@@ -80,11 +80,49 @@ The agent is structured as a graph with nodes for decision-making and tool usage
 
 ## Helicone Integration Details
 
-The example shows three ways to integrate Helicone:
+This example demonstrates how to integrate Helicone with LangGraph using OpenAI's proxy approach:
 
-1. **API Proxy** - Route OpenAI calls through Helicone's proxy
-2. **Custom Headers** - Add custom properties to track specific information
-3. **Traces** - Group related requests into logical traces for better visualization
+1. **API Proxy** - Route OpenAI calls through Helicone's proxy URL:
+
+   ```typescript
+   const model = new ChatOpenAI({
+     configuration: {
+       baseURL: "https://oai.hconeai.com/v1", // Helicone proxy URL
+       headers: {
+         "Helicone-Auth": `Bearer ${HELICONE_API_KEY}`,
+       },
+     },
+   });
+   ```
+
+2. **Request Properties** - Add custom tracking properties via headers:
+
+   ```typescript
+   // Global properties in model configuration
+   headers: {
+     "Helicone-Property-Session": "langgraph-demo",
+     "Helicone-Property-App": "weather-agent",
+     "Helicone-User-Id": "example-user-123"
+   }
+
+   // Per-request properties
+   const response = await model.invoke(messages, {
+     headers: {
+       "Helicone-Property-Node": "agent_decision"
+     }
+   });
+   ```
+
+3. **Session Tracking** - Group related requests using session properties:
+   ```typescript
+   await app.invoke(messages, {
+     configurable: {
+       headers: {
+         "Helicone-Property-Session": "weather_query_sf",
+       },
+     },
+   });
+   ```
 
 ## Further Resources
 

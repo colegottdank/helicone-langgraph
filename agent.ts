@@ -22,29 +22,21 @@ import { ChatOpenAI } from "@langchain/openai";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { StateGraph, MessagesAnnotation } from "@langchain/langgraph";
-import { Helicone } from "helicone";
-
-// Initialize Helicone
-const helicone = new Helicone({
-  apiKey: HELICONE_API_KEY,
-});
+// Helicone is integrated via the OpenAI configuration, not as a separate import
 
 // Define the tools for the agent to use
 const tools = [new TavilySearchResults({ maxResults: 3 })];
 const toolNode = new ToolNode(tools);
 
-// Create a model with Helicone integration
+// Create a model with Helicone integration via proxy
 const model = new ChatOpenAI({
   model: "gpt-3.5-turbo",
   temperature: 0,
+  openAIApiKey: OPENAI_API_KEY,
   configuration: {
     baseURL: "https://oai.hconeai.com/v1", // Helicone proxy URL
-    baseOptions: {
-      headers: {
-        "Helicone-Auth": `Bearer ${HELICONE_API_KEY}`,
-        // Optional: Add custom properties to help identify and filter requests
-        "Helicone-Property-Session": "langgraph-demo",
-      },
+    headers: {
+      "Helicone-Auth": `Bearer ${HELICONE_API_KEY}`,
     },
   },
 }).bindTools(tools);
@@ -63,17 +55,14 @@ function shouldContinue({ messages }: typeof MessagesAnnotation.State) {
 
 // Define the function that calls the model
 async function callModel(state: typeof MessagesAnnotation.State) {
-  // Add custom metadata for Helicone tracking
-  const metadata = {
-    custom_property: "agent_decision_node",
-    user_id: "example_user_123",
-  };
-
-  // We could add custom Helicone properties here
-  helicone.logProperty("node", "agent_decision");
-  helicone.logProperty("workflow_step", "reasoning");
-
-  const response = await model.invoke(state.messages);
+  // We can add custom headers for this specific request
+  // This will be tracked in Helicone automatically
+  const response = await model.invoke(state.messages, {
+    headers: {
+      "Helicone-Property-Node": "agent_decision",
+      "Helicone-Property-Request-Type": "reasoning",
+    },
+  });
 
   // We return a list, because this will get added to the existing list
   return { messages: [response] };
@@ -93,34 +82,36 @@ const app = workflow.compile();
 async function runAgent() {
   try {
     console.log("Running first query...");
-    // Track execution with Helicone
-    helicone.openTrace({
-      name: "weather_query_sf",
-      userId: "example_user",
-    });
-
-    // Use the agent
-    const finalState = await app.invoke({
-      messages: [new HumanMessage("what is the weather in sf")],
-    });
-
-    helicone.closeTrace();
+    // Use the agent with Helicone tracking
+    const finalState = await app.invoke(
+      {
+        messages: [new HumanMessage("what is the weather in sf")],
+      },
+      {
+        configurable: {
+          headers: {
+            "Helicone-Property-Session": "weather_query_sf",
+          },
+        },
+      }
+    );
 
     console.log(finalState.messages[finalState.messages.length - 1].content);
 
     console.log("\nRunning follow-up query...");
-    // Start a new trace for the second query
-    helicone.openTrace({
-      name: "weather_query_ny",
-      userId: "example_user",
-    });
-
-    const nextState = await app.invoke({
-      // Including the messages from the previous run gives the LLM context
-      messages: [...finalState.messages, new HumanMessage("what about ny")],
-    });
-
-    helicone.closeTrace();
+    const nextState = await app.invoke(
+      {
+        // Including the messages from the previous run gives the LLM context
+        messages: [...finalState.messages, new HumanMessage("what about ny")],
+      },
+      {
+        configurable: {
+          headers: {
+            "Helicone-Property-Session": "weather_query_ny",
+          },
+        },
+      }
+    );
 
     console.log(nextState.messages[nextState.messages.length - 1].content);
   } catch (error) {

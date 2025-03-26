@@ -1,0 +1,10 @@
+{
+  "graphs": {
+    "weather_agent": "./agent.ts:app"
+  },
+  "env": "./.env",
+  "node_version": "20",
+  "dev": {
+    "port": 3000
+  }
+}

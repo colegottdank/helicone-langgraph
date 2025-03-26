@@ -1,0 +1,19 @@
+# LangGraph Cloud configuration file
+name: helicone-weather-agent
+description: Weather agent with Helicone observability integration
+graphs:
+  - name: weather_agent
+    path: agent.ts
+    entrypoint: app
+    # Optional: Define exposed API endpoints
+    api:
+      endpoints:
+        - path: /invoke
+          method: post
+          operation_id: invoke
+        - path: /stream
+          method: post
+          operation_id: stream
+      # Optional: Add authentication
+      authentication:
+        type: bearer_token # or 'api_key'
